@@ -1,0 +1,62 @@
+Download Virginia OSM data
+mkdir -p ~/GitHub/va-postgres-db/osmdata && cd ~/GitHub/va-postgres-db/osmdata
+wget https://download.geofabrik.de/north-america/us/virginia-latest.osm.pbf
+
+Start PostGIS container
+docker run -d \
+  --name postgis_virginia \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=gis \
+  -v $HOME/osmdata/pgdata:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  postgis/postgis:16-3.4
+
+Install osm2pgsql on macOS
+brew install osm2pgsql
+osm2pgsql --version
+
+Import the Geofabrik data (running from ~/osmdata)
+osm2pgsql \
+  -H localhost \
+  -d gis \
+  -U postgres \
+  -W \
+  --create \
+  --slim \
+  --hstore \
+  --latlong \
+  virginia-latest.osm.pbf
+
+enter password when prompted: postgres
+
+Connect to your PostGIS DB
+docker exec -it postgis_virginia psql -U postgres -d gis
+Or connect from host:
+psql -h localhost -U postgres -d gis
+
+
+Example Query:
+
+-- List available highway types
+SELECT DISTINCT tags->'highway'
+FROM planet_osm_line
+WHERE tags ? 'highway';
+
+-- Count all highway features
+SELECT COUNT(*) 
+FROM planet_osm_line 
+WHERE tags ? 'highway';
+
+-- Sample geometry output
+SELECT name, tags->'highway' AS type, ST_AsText(way)
+FROM planet_osm_line
+WHERE tags->'highway' IN ('motorway', 'trunk', 'primary')
+LIMIT 10;
+
+-- (Optional) Filter by bounding box (e.g., around Richmond)
+SELECT name, ST_AsText(way)
+FROM planet_osm_line
+WHERE tags->'highway' IS NOT NULL
+  AND way && ST_MakeEnvelope(-77.6, 37.4, -77.3, 37.6, 4326)
+LIMIT 20;
