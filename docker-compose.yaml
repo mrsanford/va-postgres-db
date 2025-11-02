@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  postgis-db:
+    build:
+      context: ./db
+    container_name: postgis_virginia
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gis
+    volumes:
+      - ./osmdata/pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  osm-importer:
+    build:
+      context: ./importer
+    depends_on:
+      - postgis-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gis
+      POSTGRES_HOST: postgis-db
+      PBF_URL: https://download.geofabrik.de/north-america/us/virginia-latest.osm.pbf
+    volumes:
+      - ./osmdata:/data
