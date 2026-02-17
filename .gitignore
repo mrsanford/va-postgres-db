@@ -1,1 +1,3 @@
 osmdata
+*.tif.aux.xml
+*.tif
