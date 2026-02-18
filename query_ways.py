@@ -1,5 +1,7 @@
 import psycopg
 from shapely import wkb
+import shapely
+from typing import List
 
 OSM_HIGHWAYS = [
     "motorway",
@@ -23,7 +25,7 @@ def fetch_highways(
     user="postgres",
     password="postgres",
     highway_filters=OSM_HIGHWAYS,
-):
+) -> List[shapely.geometry.LineString]:
     """
     bbox_tile is in EPSG:4326 (left, bottom, right, top) = (lon_min, lat_min, lon_max, lat_max)
     planet_osm_line.way is in EPSG:3857 (osm2pgsql default)
@@ -55,5 +57,4 @@ def fetch_highways(
             rows = cur.fetchall()
     finally:
         conn.close()
-
     return [(wkb.loads(geom_wkb), hw_tag) for geom_wkb, hw_tag in rows]
