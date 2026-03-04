@@ -26,25 +26,20 @@ def fetch_highways(
     password="postgres",
     highway_filters=OSM_HIGHWAYS,
 ) -> List[shapely.geometry.LineString]:
-    """
-    bbox_tile is in EPSG:4326 (left, bottom, right, top) = (lon_min, lat_min, lon_max, lat_max)
-    planet_osm_line.way is in EPSG:3857 (osm2pgsql default)
-    Returns geometries transformed back to EPSG:4326 for tile compatibility.
-    """
+
     left, bottom, right, top = bbox_tile
 
     QUERY = """
     WITH bbox AS (
-    SELECT ST_Transform(
-            ST_MakeEnvelope(%s, %s, %s, %s, 4326),
-            3857
-            ) AS geom_3857
+    SELECT ST_MakeEnvelope(%s, %s, %s, %s, 4326) AS geom
     )
-    SELECT ST_AsBinary(ST_Transform(way, 4326)) AS geom_wkb, highway
-    FROM planet_osm_line, bbox
-    WHERE highway = ANY(%s)
-    AND way && bbox.geom_3857
-    AND ST_Intersects(way, bbox.geom_3857);
+    SELECT
+    ST_AsBinary(l.way) AS geom_wkb,
+    l.highway
+    FROM public.planet_osm_line AS l, bbox AS b
+    WHERE l.highway = ANY(%s)
+    AND l.way && b.geom
+    AND ST_Intersects(l.way, b.geom);
     """
 
     conn = psycopg.connect(
@@ -57,4 +52,13 @@ def fetch_highways(
             rows = cur.fetchall()
     finally:
         conn.close()
-    return [(wkb.loads(geom_wkb), hw_tag) for geom_wkb, hw_tag in rows]
+    out = []
+    for geom_wkb, hw_tag in rows:
+        g = wkb.loads(geom_wkb)
+        if g is None or g.is_empty:
+            continue
+        out.append((g, hw_tag))
+    return out
+
+
+# to activate psql again: psql -h localhost -p 5440 -U postgres -d gis
