@@ -2,19 +2,7 @@ import psycopg
 from shapely import wkb
 from typing import List, Tuple
 from shapely.geometry import base
-
-OSM_HIGHWAYS = [
-    "motorway",
-    "motorway_link",
-    "trunk",
-    "trunk_link",
-    "primary",
-    "primary_link",
-    "secondary",
-    "secondary_link",
-    "tertiary",
-    "tertiary_link",
-]
+from src.utils.helpers import OSM_HIGHWAYS
 
 
 def fetch_highways(
@@ -44,7 +32,7 @@ def fetch_highways(
     )
     try:
         with conn.cursor() as cur:
-            # We pass 5 arguments: 4 for the envelope, 1 for the highway list
+            # Total 5 arguments: 4 for envelope, 1 for highway list
             cur.execute(QUERY, (left, bottom, right, top, highway_filters))
             rows = cur.fetchall()
     finally:
