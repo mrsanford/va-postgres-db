@@ -1,6 +1,8 @@
-from distance_calculate import process_region_grouped_distance, write__dist_geotiff
-from tile_rasterize import generate_mask_tiles
-import os
+from src.distance_calculate import process_region_grouped_distance, write__dist_geotiff
+from src.tile_rasterize import generate_mask_tiles
+from src.utils.helpers import MASK_DIR, DISTANCE_DIR
+from pathlib import Path
+
 
 if __name__ == "__main__":
     va_bbox = (-77.5, 37.2, -76.8, 37.8)
@@ -19,23 +21,22 @@ if __name__ == "__main__":
     }
 
     # 1. GENERATE MASKS (Requires DB)
-    mask_dir = "./va_tiles/mask"
-    os.makedirs(mask_dir, exist_ok=True)
     print("--- Phase 1: Masking ---")
-    generate_mask_tiles(va_bbox, output_dir=mask_dir, **common_config)
+    generate_mask_tiles(va_bbox, output_dir=MASK_DIR, **common_config)
     # 2. COMPUTE DISTANCE (Uses Disk, DB is Fallback)
-    dist_dir = "./va_tiles/distance"
-    os.makedirs(dist_dir, exist_ok=True)
     distance_config = {
         **common_config,
         "block_tiles": 2,
         "halo_tiles": 1,
-        "mask_input_dir": mask_dir,
+        "mask_input_dir": MASK_DIR,
     }
     print("\n--- Phase 2: Distance Calculation ---")
     for result in process_region_grouped_distance(va_bbox, **distance_config):
         r0, c0 = result["tile_row0"], result["tile_col0"]
-        filepath = os.path.join(dist_dir, f"dist_USA_VA_{r0}_{c0}.tif")
+        res_suffix = "res_0002"
+        region = "USA_VA"
+        filename = f"dist_{region}_{r0}_{c0}_{res_suffix}.tif"
+        filepath = DISTANCE_DIR / filename
         write__dist_geotiff(
             path=filepath, arr=result["tile_dist"], bbox=result["tile_bbox"]
         )

@@ -1,19 +1,18 @@
-import numpy as np
-import os
-import rasterio
 import distancerasters as dr
+import numpy as np
+import rasterio
 from rasterio.transform import from_bounds
+from src.utils.helpers import CRS, MASK_DIR
 from typing import Tuple, Iterator
-from tile_rasterize import (
+from src.tile_rasterize import (
     tile_iter_over_bbox,
     window_to_bbox,
     build_mask_tile,
     clip_array_to_window,
 )
 
-CRS = "EPSG:4326"
 
-
+# --- Distance GeoTIFF ---
 def write__dist_geotiff(
     path: str, arr: np.ndarray, bbox: Tuple[float, float, float, float]
 ):
@@ -37,6 +36,7 @@ def write__dist_geotiff(
         dst.write(write_arr.astype(np.float32), 1)
 
 
+# --- Calculate Distance ---
 def calculate_distance(
     rv_array: np.ndarray, transform, output_path: str | None = None
 ) -> np.ndarray:
@@ -54,6 +54,7 @@ def calculate_distance(
     return dr_obj.dist_array.astype(np.float32, copy=False)
 
 
+# --- Full Distance Flow ---
 def process_region_grouped_distance(
     global_bbox: Tuple[float, float, float, float],
     pixel_size_deg: float,
@@ -69,13 +70,14 @@ def process_region_grouped_distance(
     print(f"Stage 1: Building mask store (Checking {mask_input_dir} then DB)...")
     for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox, pixel_size_deg, tile_px):
         region = "USA_VA"
-        mask_filename = f"{region}_tile_{r0}_{c0}.tif"
-        mask_path = os.path.join(mask_input_dir, mask_filename)
-        if os.path.exists(mask_path):
+        res_suffix = "res_0002"  # CUSTOMIZABLE
+        mask_filename = f"{region}_tile_{r0}_{c0}_{res_suffix}.tif"
+        mask_path = MASK_DIR / mask_filename
+        if mask_path.exists():
             with rasterio.open(mask_path) as src:
                 # Read band 1. Result is 2D (H, W)
                 mask_data = src.read(1)
-                # If for some reason it's 3D (1, H, W), squeeze it
+                # If it's 3D (1, H, W), squeeze it
                 if mask_data.ndim == 3:
                     mask_data = mask_data[0]
                 mask_store[(r0, c0)] = {"tile_mask": mask_data}
@@ -89,7 +91,6 @@ def process_region_grouped_distance(
     # --- Stage 2 & 3: Grouped Distance ---
     block_px = tile_px * block_tiles
     halo_px = tile_px * halo_tiles
-
     for br0, br1, bc0, bc1 in tile_iter_over_bbox(
         global_bbox, pixel_size_deg, block_px
     ):

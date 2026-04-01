@@ -1,20 +1,17 @@
 import math
 from typing import Tuple
 import rasterio
-import os
+from pathlib import Path
 import numpy as np
 from rasterio.features import rasterize
 from rasterio.transform import from_bounds
-from query_ways import fetch_highways
-
-CRS = "EPSG:4326"
-LON_MIN, LON_MAX = -180.0, 180.0
-LAT_MIN, LAT_MAX = -90.0, 90.0
+from src.query_ways import fetch_highways
+from src.utils.helpers import CRS, LON_MIN, LON_MAX, LAT_MIN, LAT_MAX
 
 
 # --- Write to Disk ---
 def write_mask_geotiff(
-    path: str, arr: np.ndarray, bbox: Tuple[float, float, float, float]
+    path: Path | str, arr: np.ndarray, bbox: Tuple[float, float, float, float]
 ):
     """Writes a 0/1 mask to a GeoTIFF."""
     h, w = arr.shape
@@ -29,6 +26,7 @@ def write_mask_geotiff(
         "transform": transform,
         "compress": "deflate",
     }
+    path.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(path, "w", **profile) as dst:
         dst.write(arr, 1)
 
@@ -150,7 +148,7 @@ def build_mask_tile(row0, row1, col0, col1, pixel_size_deg, overlap_px, db_confi
     }
 
 
-# --- Main Execution Flow ---
+# --- Complete Mask Flow ---
 def generate_mask_tiles(
     global_bbox: Tuple[float, float, float, float],
     pixel_size_deg: float,
@@ -162,13 +160,14 @@ def generate_mask_tiles(
     """
     Orchestrates the query and rasterization for a region.
     """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    # 1. Determines tile count for progress logging
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Tile Computation for Progress Logging
     nx, ny, total = tile_count_over_bbox(global_bbox, pixel_size_deg, tile_px)
     print(f"Global Grid: {grid_shape(pixel_size_deg)}")
     print(f"Region: {nx}x{ny} tiles ({total} total)")
-    # 2. Iterate and processes raster
+    # Iterate and Process Raster
     for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox, pixel_size_deg, tile_px):
         # build_mask_tile handles the expanded query and the clip back to core tile_px
         tile_data = build_mask_tile(
@@ -176,12 +175,12 @@ def generate_mask_tiles(
         )
         mask = tile_data["tile_mask"]
         bbox = tile_data["tile_bbox"]
-        # 3. Save only if there are roads (optional optimization)
+        # Savinng onyl if roads exists (optional optimization)
         if mask.any():
             # Standard naming convention: tile_{row}_{col}.tif
             region = "USA_VA"
             filename = f"{region}_tile_{r0}_{c0}.tif"
-            filepath = os.path.join(output_dir, filename)
+            filepath = output_path / filename
             write_mask_geotiff(filepath, mask, bbox)
             print(f"Saved: {filename} ({tile_data['roads_count']} roads)")
         else:
