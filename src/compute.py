@@ -1,7 +1,6 @@
 from src.distance_calculate import process_region_grouped_distance, write__dist_geotiff
 from src.tile_rasterize import generate_mask_tiles
 from src.utils.helpers import MASK_DIR, DISTANCE_DIR
-from pathlib import Path
 
 
 if __name__ == "__main__":
@@ -20,10 +19,11 @@ if __name__ == "__main__":
         },
     }
 
-    # 1. GENERATE MASKS (Requires DB)
+    # GENERATE MASKS (Requires DB)
+    # Generate Masks
     print("--- Phase 1: Masking ---")
     generate_mask_tiles(va_bbox, output_dir=MASK_DIR, **common_config)
-    # 2. COMPUTE DISTANCE (Uses Disk, DB is Fallback)
+    # COMPUTE DISTANCE (Uses DB as fallback, tries to load from memory first)
     distance_config = {
         **common_config,
         "block_tiles": 2,
