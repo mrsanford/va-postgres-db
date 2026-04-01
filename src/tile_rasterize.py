@@ -6,7 +6,15 @@ import numpy as np
 from rasterio.features import rasterize
 from rasterio.transform import from_bounds
 from src.query_ways import fetch_highways
-from src.utils.helpers import CRS, LON_MIN, LON_MAX, LAT_MIN, LAT_MAX
+from src.utils.helpers import (
+    CRS,
+    LON_MIN,
+    LON_MAX,
+    LAT_MIN,
+    LAT_MAX,
+    REGION,
+    RES_SUFFIX,
+)
 
 
 # --- Write to Disk ---
@@ -175,11 +183,9 @@ def generate_mask_tiles(
         )
         mask = tile_data["tile_mask"]
         bbox = tile_data["tile_bbox"]
-        # Savinng onyl if roads exists (optional optimization)
+        # Saving ONLY if roads exists (optional optimization)
         if mask.any():
-            # Standard naming convention: tile_{row}_{col}.tif
-            region = "USA_VA"
-            filename = f"{region}_tile_{r0}_{c0}.tif"
+            filename = f"{REGION}_tile_{r0}_{c0}_{RES_SUFFIX}.tif"
             filepath = output_path / filename
             write_mask_geotiff(filepath, mask, bbox)
             print(f"Saved: {filename} ({tile_data['roads_count']} roads)")

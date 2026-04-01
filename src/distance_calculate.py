@@ -1,8 +1,9 @@
 import distancerasters as dr
 import numpy as np
 import rasterio
+from pathlib import Path
 from rasterio.transform import from_bounds
-from src.utils.helpers import CRS, MASK_DIR
+from src.utils.helpers import CRS, MASK_DIR, REGION, RES_SUFFIX
 from typing import Tuple, Iterator
 from src.tile_rasterize import (
     tile_iter_over_bbox,
@@ -14,7 +15,7 @@ from src.tile_rasterize import (
 
 # --- Distance GeoTIFF ---
 def write__dist_geotiff(
-    path: str, arr: np.ndarray, bbox: Tuple[float, float, float, float]
+    path: Path | str, arr: np.ndarray, bbox: Tuple[float, float, float, float]
 ):
     """Writes a float32 distance raster to a GeoTIFF"""
     h, w = arr.shape
@@ -38,7 +39,7 @@ def write__dist_geotiff(
 
 # --- Calculate Distance ---
 def calculate_distance(
-    rv_array: np.ndarray, transform, output_path: str | None = None
+    rv_array: np.ndarray, transform, output_path: Path | str | None = None
 ) -> np.ndarray:
     rv_array = rv_array.astype(np.uint8, copy=False)
 
@@ -62,16 +63,14 @@ def process_region_grouped_distance(
     overlap_px: int,
     block_tiles: int,
     halo_tiles: int,
-    mask_input_dir: str = "./va_tiles/mask",
+    mask_input_dir: Path | str = MASK_DIR,
     **db_config,
 ) -> Iterator[dict]:
     # --- Stage 1: Build the Mask Store (Disk-First) ---
     mask_store = {}
     print(f"Stage 1: Building mask store (Checking {mask_input_dir} then DB)...")
     for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox, pixel_size_deg, tile_px):
-        region = "USA_VA"
-        res_suffix = "res_0002"  # CUSTOMIZABLE
-        mask_filename = f"{region}_tile_{r0}_{c0}_{res_suffix}.tif"
+        mask_filename = f"{REGION}_tile_{r0}_{c0}_{RES_SUFFIX}.tif"
         mask_path = MASK_DIR / mask_filename
         if mask_path.exists():
             with rasterio.open(mask_path) as src:

@@ -1,6 +1,6 @@
 from src.distance_calculate import process_region_grouped_distance, write__dist_geotiff
 from src.tile_rasterize import generate_mask_tiles
-from src.utils.helpers import MASK_DIR, DISTANCE_DIR
+from src.utils.helpers import MASK_DIR, DISTANCE_DIR, REGION, RES_SUFFIX
 
 
 if __name__ == "__main__":
@@ -33,9 +33,7 @@ if __name__ == "__main__":
     print("\n--- Phase 2: Distance Calculation ---")
     for result in process_region_grouped_distance(va_bbox, **distance_config):
         r0, c0 = result["tile_row0"], result["tile_col0"]
-        res_suffix = "res_0002"
-        region = "USA_VA"
-        filename = f"dist_{region}_{r0}_{c0}_{res_suffix}.tif"
+        filename = f"dist_{REGION}_{r0}_{c0}_{RES_SUFFIX}.tif"
         filepath = DISTANCE_DIR / filename
         write__dist_geotiff(
             path=filepath, arr=result["tile_dist"], bbox=result["tile_bbox"]
