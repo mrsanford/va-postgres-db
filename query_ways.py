@@ -1,7 +1,7 @@
 import psycopg
 from shapely import wkb
-import shapely
-from typing import List
+from typing import List, Tuple
+from shapely.geometry import base
 
 OSM_HIGHWAYS = [
     "motorway",
@@ -25,40 +25,37 @@ def fetch_highways(
     user="postgres",
     password="postgres",
     highway_filters=OSM_HIGHWAYS,
-) -> List[shapely.geometry.LineString]:
-
+) -> List[Tuple[base.BaseGeometry, str]]:
     left, bottom, right, top = bbox_tile
-
     QUERY = """
     WITH bbox AS (
-    SELECT ST_MakeEnvelope(%s, %s, %s, %s, 4326) AS geom
+        SELECT ST_MakeEnvelope(%s, %s, %s, %s, 4326) AS geom
     )
     SELECT
-    ST_AsBinary(l.way) AS geom_wkb,
-    l.highway
+        ST_AsBinary(l.way) AS geom_wkb,
+        l.highway
     FROM public.planet_osm_line AS l, bbox AS b
-    WHERE l.highway = ANY(%s)
-    AND l.way && b.geom
-    AND ST_Intersects(l.way, b.geom);
+    WHERE l.highway = ANY(%s::text[])
+      AND l.way && b.geom
+      AND ST_Intersects(l.way, b.geom);
     """
-
     conn = psycopg.connect(
         host=host, port=port, dbname=dbname, user=user, password=password
     )
     try:
         with conn.cursor() as cur:
-            # note param order matches the query (bbox coords first, then highway_filters)
+            # We pass 5 arguments: 4 for the envelope, 1 for the highway list
             cur.execute(QUERY, (left, bottom, right, top, highway_filters))
             rows = cur.fetchall()
     finally:
         conn.close()
     out = []
     for geom_wkb, hw_tag in rows:
-        g = wkb.loads(geom_wkb)
-        if g is None or g.is_empty:
+        try:
+            g = wkb.loads(geom_wkb)
+            if g is None or g.is_empty:
+                continue
+            out.append((g, hw_tag))
+        except Exception:
             continue
-        out.append((g, hw_tag))
     return out
-
-
-# to activate psql again: psql -h localhost -p 5440 -U postgres -d gis
