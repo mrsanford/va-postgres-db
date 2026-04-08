@@ -173,14 +173,14 @@ def generate_mask_tiles(
 
     # Tile Computation for Progress Logging
     nx, ny, total = tile_count_over_bbox(global_bbox, pixel_size_deg, tile_px)
-    print(f"Global Grid: {grid_shape(pixel_size_deg)}")
-    print(f"Region: {nx}x{ny} tiles ({total} total)")
+    # logger.info(f"Global Grid: {grid_shape(pixel_size_deg)}")
+    # logger.info(f"Region: {nx}x{ny} tiles ({total} total)")
+
     # Iterate and Process Raster
     for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox, pixel_size_deg, tile_px):
-        # build_mask_tile handles the expanded query and the clip back to core tile_px
         tile_data = build_mask_tile(
             r0, r1, c0, c1, pixel_size_deg, overlap_px, db_config
-        )
+        )  # build_mask_tile handles the expanded query and the clip back to core tile_px
         mask = tile_data["tile_mask"]
         bbox = tile_data["tile_bbox"]
         # Saving ONLY if roads exists (optional optimization)
@@ -188,6 +188,7 @@ def generate_mask_tiles(
             filename = f"{REGION}_tile_{r0}_{c0}_{RES_SUFFIX}.tif"
             filepath = output_path / filename
             write_mask_geotiff(filepath, mask, bbox)
-            print(f"Saved: {filename} ({tile_data['roads_count']} roads)")
+            # logger.info(f"Saved: {filename} ({tile_data['roads_count']} roads)")
         else:
+            # logger.info(f"Skipping empty tile: {r0}_{c0}")
             print(f"Skipping empty tile: {r0}_{c0}")

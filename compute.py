@@ -4,10 +4,10 @@ from src.utils.helpers import MASK_DIR, DISTANCE_DIR, REGION, RES_SUFFIX
 
 
 if __name__ == "__main__":
-    va_bbox = (-77.5, 37.2, -76.8, 37.8)
-
+    va_bbox = (-83.67, 36.54, -75.16, 39.46)
+    # (-77.5, 37.2, -76.8, 37.8)
     common_config = {
-        "pixel_size_deg": 0.0002,
+        "pixel_size_deg": 0.0001,
         "tile_px": 512,
         "overlap_px": 16,
         "db_config": {
@@ -19,18 +19,19 @@ if __name__ == "__main__":
         },
     }
 
-    # GENERATE MASKS (Requires DB)
-    # Generate Masks
-    print("--- Phase 1: Masking ---")
+    # update the level of the pixels -- not just how many pixels in each tile
+    # but how many tiles
+
+    # --- Masking ---
     generate_mask_tiles(va_bbox, output_dir=MASK_DIR, **common_config)
-    # COMPUTE DISTANCE (Uses DB as fallback, tries to load from memory first)
+
+    # --- Distance Calculation ---
     distance_config = {
         **common_config,
-        "block_tiles": 2,
-        "halo_tiles": 1,
+        "block_tiles": 3,
+        "halo_tiles": 1.4,
         "mask_input_dir": MASK_DIR,
     }
-    print("\n--- Phase 2: Distance Calculation ---")
     for result in process_region_grouped_distance(va_bbox, **distance_config):
         r0, c0 = result["tile_row0"], result["tile_col0"]
         filename = f"dist_{REGION}_{r0}_{c0}_{RES_SUFFIX}.tif"

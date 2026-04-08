@@ -1,7 +1,7 @@
 from pathlib import Path
 
 _SELF_DIR = Path(__file__).resolve().parent
-ROOT_DIR = _SELF_DIR.parent.parent.parent
+ROOT_DIR = _SELF_DIR.parent.parent
 
 DATA_DIR = ROOT_DIR / "data"
 
