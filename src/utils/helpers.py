@@ -16,7 +16,7 @@ for folder in [DATA_DIR, OUTPUT_DIR, MASK_DIR, DISTANCE_DIR]:
 CRS = "EPSG:4326"
 LON_MIN, LON_MAX = -180.0, 180.0
 LAT_MIN, LAT_MAX = -90.0, 90.0
-RES_SUFFIX = "res_0002"
+RES_SUFFIX = "res_0001"
 REGION = "USA_VA"
 
 # Be able to adjust the tile size (level 8 tiles vs level 6 tiles) and not just the pixel size

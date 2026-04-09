@@ -4,8 +4,7 @@ from src.utils.helpers import MASK_DIR, DISTANCE_DIR, REGION, RES_SUFFIX
 
 
 if __name__ == "__main__":
-    va_bbox = (-83.67, 36.54, -75.16, 39.46)
-    # (-77.5, 37.2, -76.8, 37.8)
+    va_bbox = (-77.5, 37.2, -76.8, 37.8)  # (-83.67, 36.54, -75.16, 39.46)
     common_config = {
         "pixel_size_deg": 0.0001,
         "tile_px": 512,
