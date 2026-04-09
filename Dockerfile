@@ -5,11 +5,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version* ./
 
 # --frozen ensures uv doesn't modify the lockfile
-# --no-dev excludes development dependencies for a smaller image
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen
 
 COPY src/ ./src/
-COPY data/ ./data/
+# COPY data/ ./data/
 COPY db/ ./db/
 COPY compute.py .
 
