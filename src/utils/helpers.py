@@ -5,10 +5,11 @@ ROOT_DIR = _SELF_DIR.parent.parent
 
 # -- TIFF Specifics ---
 OUTPUT_DIR = ROOT_DIR / "visualization"
+PIPELINE_DIR = ROOT_DIR / "pipeline"
 MASK_DIR = OUTPUT_DIR / "mask"
 DISTANCE_DIR = OUTPUT_DIR / "distance"
 
-for folder in [OUTPUT_DIR, MASK_DIR, DISTANCE_DIR]:
+for folder in [OUTPUT_DIR, PIPELINE_DIR, MASK_DIR, DISTANCE_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 CRS = "EPSG:4326"

@@ -1,7 +1,3 @@
-__pycache__/
-.pytest_cache/
-.venv/
-.git/
-*.qgz
-osmdata/
-visualization/
+.git
+.venv
+data/

@@ -11,12 +11,18 @@ services:
       - ./osmdata/pgdata:/var/lib/postgresql/data
     ports:
       - "5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gis"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   osm-importer:
     build:
       context: ./importer
     depends_on:
-      - postgis-db
+      postgis-db:
+        condition: service_healthy
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -25,3 +31,21 @@ services:
       PBF_URL: https://download.geofabrik.de/north-america/us/virginia-latest.osm.pbf
     volumes:
       - ./osmdata:/data
+
+  workflow-execute:
+      build:
+        context: .
+      container_name: workflow_runner
+      depends_on:
+        postgis-db:
+          condition: service_healthy
+        osm-importer:
+          condition: service_completed_successfully
+      environment:
+        - POSTGRES_HOST=postgis-db
+        - POSTGRES_PORT=5432
+        - POSTGRES_DB=gis
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=postgres
+      volumes:
+        - ./osmdata:/data

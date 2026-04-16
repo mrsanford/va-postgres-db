@@ -1,17 +1,24 @@
 from src.distance_calculate import process_region_grouped_distance, write__dist_geotiff
 from src.tile_rasterize import generate_mask_tiles
-from src.utils.helpers import MASK_DIR, DISTANCE_DIR, REGION, RES_SUFFIX
-
+from src.utils.helpers import (
+    MASK_DIR,
+    DISTANCE_DIR,
+    REGION,
+    RES_SUFFIX,
+)
+import os
 
 if __name__ == "__main__":
+    db_host = os.getenv("POSTGRES_HOST", "localhost")
+    db_port = int(os.getenv("POSTGRES_PORT", 5432))
     va_bbox = (-77.5, 37.2, -76.8, 37.8)  # (-83.67, 36.54, -75.16, 39.46)
     common_config = {
         "pixel_size_deg": 0.0001,
         "tile_px": 512,
         "overlap_px": 16,
         "db_config": {
-            "host": "localhost",
-            "port": 5440,
+            "host": db_host,
+            "port": db_port,
             "dbname": "gis",
             "user": "postgres",
             "password": "postgres",
