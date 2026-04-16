@@ -1,4 +1,34 @@
-# Welcome to VA Postgres DB Repo
+# Geofabrik-OSM Raster Pipeline
+
+This project encompasses a customized, containerized workflow for ingesting OpenStreetMap (OSM) data into PostGIS and generating high-resolution "distance-to-roads" raster.
+
+## Quick Start
+
+1. **Initialize the Environment**
+The project uses `docker compose` to orchestrate the PostGIS database and the Python processing environments. 
+``` 
+# To start the stack
+docker compose up
+
+# Stop the stack
+docker compose down
+```
+
+2. **Access the Database**
+After the container starts and is running, you can connect to the local PostGIS instance:
+```
+psql - h localhost -p 5440 -U postgres -d gis
+```
+
+## Raster Generation
+**Distance Seam Mitigation**
+**Configuration Goals**
+
+
+## Init
+```docker compose up```
+The first time will start the container, download the data into a PostGRES/PostGIS database, and allow queries. 
+```docker compose down```
 
 Welcome to the PostGIS/OSM repo, which tracks the changes for the containerized workflow and Python (uv-managed) section. This project allows users to start up the container, download data into a postgres database, immediately query, and ultimately get a distance-to-roads raster.
 
@@ -39,3 +69,32 @@ Next week: plan to come up with visualization
 Structure out steps and determine
 - Pick a subset of around Richmond and the bounding box of like 5-10 miles
 
+accessing psql
+psql -h localhost -p 5440 -U postgres -d gis
+
+calculate the tile extent and the encompassing bounding
+fixed number of extra degrees in any direction 
+ENCOMPASSING_BOUNDING_BOX_PERCENT
+
+
+What packages and what scripts for the container?
+Add container to do the compiling work
+
+FROM ghcr.io/astral-sh/uv:debian
+
+# Dependency Install
+
+build container for packaging python
+UV Documentation -- There is a container with UV
+add uv dependencies to dockerfile
+
+DOCKER:
+COPY just the pyproject.toml
+COPY just the .python-version
+COPY the uv.lock
+uv sync
+
+COPY src
+
+# github actions right after the docker
+# everytime you commit, container will be rebuilt
