@@ -34,9 +34,3 @@ TILE_PX = int(os.getenv("TILE_PX", 1024))
 OVERLAP_PX = int(os.getenv("OVERLAP_PX", 0))
 BLOCK_TILES = int(os.getenv("BLOCK_TILES", 4))
 HALO_TILES = float(os.getenv("HALO_TILES", 0.8))
-
-# # --- Tile & Halo Settings (Addressing your TODOs) ---
-# # Level 8 default, but now adjustable via ENV
-# TILE_LEVEL = int(os.getenv("TILE_LEVEL", 8))
-# # Halo as a fraction (e.g., 0.8 for 80% overhang)
-# HALO_SIZE = float(os.getenv("HALO_SIZE", 1.0))
