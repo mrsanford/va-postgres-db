@@ -14,6 +14,9 @@ from src.utils.helpers import (
     LAT_MAX,
     REGION,
     RES_SUFFIX,
+    PIXEL_SIZE_DEG,
+    TILE_PX,
+    OVERLAP_PX,
 )
 
 
@@ -34,78 +37,78 @@ def write_mask_geotiff(
         "transform": transform,
         "compress": "deflate",
     }
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(path, "w", **profile) as dst:
         dst.write(arr, 1)
 
 
 # --- Global Grid Logic ---
-def grid_shape(res_deg: float) -> tuple[int, int]:
-    """
-    Returns (width, height) of the entire 4326 world grid at this resolution.
-    Used to ensure all tiles align to the same global pixel boundaries.
-    """
-    width = int(round((LON_MAX - LON_MIN) / res_deg))
-    height = int(round((LAT_MAX - LAT_MIN) / res_deg))
+def grid_shape() -> tuple[int, int]:
+    """Returns (width, height) of the entire 4326 world grid using environment resolution."""
+    width = int(round((LON_MAX - LON_MIN) / PIXEL_SIZE_DEG))
+    height = int(round((LAT_MAX - LAT_MIN) / PIXEL_SIZE_DEG))
     return width, height
 
 
-def coords_to_rowcol(lon: float, lat: float, pixel_size_deg: float) -> tuple[int, int]:
-    """Converts a geographic coordinate to a global pixel index."""
-    col = int(math.floor((lon - LON_MIN) / pixel_size_deg))
-    row = int(math.floor((LAT_MAX - lat) / pixel_size_deg))
+def coords_to_rowcol(lon: float, lat: float) -> tuple[int, int]:
+    """Converts geographic coordinate to global pixel index using environment resolution."""
+    col = int(math.floor((lon - LON_MIN) / PIXEL_SIZE_DEG))
+    row = int(math.floor((LAT_MAX - lat) / PIXEL_SIZE_DEG))
     return row, col
 
 
-def snap_direction(x: int, tile_px: int, direction: str) -> int:
+def snap_direction(x: int, direction: str) -> int:
+    """Snaps index to TILE_PX boundaries."""
     if direction == "down":
-        return (x // tile_px) * tile_px
+        return (x // TILE_PX) * TILE_PX
     if direction == "up":
-        return ((x + tile_px - 1) // tile_px) * tile_px
+        return ((x + TILE_PX - 1) // TILE_PX) * TILE_PX
     raise ValueError("direction must be 'down' or 'up'")
 
 
 def window_to_bbox(
-    row0: int, row1: int, col0: int, col1: int, res_deg: float
+    row0: int, row1: int, col0: int, col1: int
 ) -> Tuple[float, float, float, float]:
-    """Converts pixel window back to Lon/Lat BBox, anchored to the global origin."""
-    xmin = LON_MIN + col0 * res_deg
-    xmax = LON_MIN + col1 * res_deg
-    ymax = LAT_MAX - row0 * res_deg
-    ymin = LAT_MAX - row1 * res_deg
+    """Converts pixel window back to Lon/Lat BBox using environment resolution."""
+    xmin = LON_MIN + col0 * PIXEL_SIZE_DEG
+    xmax = LON_MIN + col1 * PIXEL_SIZE_DEG
+    ymax = LAT_MAX - row0 * PIXEL_SIZE_DEG
+    ymin = LAT_MAX - row1 * PIXEL_SIZE_DEG
     return (xmin, ymin, xmax, ymax)
 
 
 # --- Tile & Block Orchestration ---
-def tile_iter_over_bbox(bbox, pixel_size_deg, tile_px):
+def tile_iter_over_bbox(bbox: Tuple[float, float, float, float]):
     min_lon, min_lat, max_lon, max_lat = bbox
-    row_top, col_left = coords_to_rowcol(min_lon, max_lat, pixel_size_deg)
-    row_bot, col_right = coords_to_rowcol(max_lon, min_lat, pixel_size_deg)
+    row_top, col_left = coords_to_rowcol(min_lon, max_lat)
+    row_bot, col_right = coords_to_rowcol(max_lon, min_lat)
+
     # Snap to tile boundaries
-    row0 = snap_direction(min(row_top, row_bot), tile_px, "down")
-    row1 = snap_direction(max(row_top, row_bot) + 1, tile_px, "up")
-    col0 = snap_direction(min(col_left, col_right), tile_px, "down")
-    col1 = snap_direction(max(col_left, col_right) + 1, tile_px, "up")
-    # Iterate
-    for r0 in range(row0, row1, tile_px):
-        for c0 in range(col0, col1, tile_px):
-            yield (r0, r0 + tile_px, c0, c0 + tile_px)
+    row0 = snap_direction(min(row_top, row_bot), "down")
+    row1 = snap_direction(max(row_top, row_bot) + 1, "up")
+    col0 = snap_direction(min(col_left, col_right), "down")
+    col1 = snap_direction(max(col_left, col_right) + 1, "up")
+
+    for r0 in range(row0, row1, TILE_PX):
+        for c0 in range(col0, col1, TILE_PX):
+            yield (r0, r0 + TILE_PX, c0, c0 + TILE_PX)
 
 
-def tile_count_over_bbox(bbox, pixel_size_deg, tile_px):
+def tile_count_over_bbox(bbox):
     """Returns (nx, ny, total) tiles needed to cover the area."""
-    it = list(tile_iter_over_bbox(bbox, pixel_size_deg, tile_px))
+    it = list(tile_iter_over_bbox(bbox))
     rows = set(t[0] for t in it)
     cols = set(t[2] for t in it)
     return len(cols), len(rows), len(it)
 
 
 # --- Raster & Mask Logic ---
-def rasterize_geoms(geoms, bbox, pixel_size_deg, all_touched=True):
+def rasterize_geoms(geoms, bbox, all_touched=True):
     xmin, ymin, xmax, ymax = bbox
     w, h = (
-        int(round((xmax - xmin) / pixel_size_deg)),
-        int(round((ymax - ymin) / pixel_size_deg)),
+        int(round((xmax - xmin) / PIXEL_SIZE_DEG)),
+        int(round((ymax - ymin) / PIXEL_SIZE_DEG)),
     )
     transform = from_bounds(xmin, ymin, xmax, ymax, w, h)
     valid_geoms = [g for g in geoms if g is not None and not g.is_empty]
@@ -130,25 +133,25 @@ def clip_array_to_window(
     return arr[r0:r1, c0:c1]
 
 
-def build_mask_tile(row0, row1, col0, col1, pixel_size_deg, overlap_px, db_config):
-    # Expand for query
+def build_mask_tile(row0: int, row1: int, col0: int, col1: int, **db_config):
+    # Expand for query using global OVERLAP_PX
     row0e, row1e, col0e, col1e = (
-        row0 - overlap_px,
-        row1 + overlap_px,
-        col0 - overlap_px,
-        col1 + overlap_px,
+        row0 - OVERLAP_PX,
+        row1 + OVERLAP_PX,
+        col0 - OVERLAP_PX,
+        col1 + OVERLAP_PX,
     )
-    bbox_expanded = window_to_bbox(row0e, row1e, col0e, col1e, pixel_size_deg)
+    bbox_expanded = window_to_bbox(row0e, row1e, col0e, col1e)
     # Query Database
     roads_data = fetch_highways(bbox_tile=bbox_expanded, **db_config)
     geoms = [g for g, tag in roads_data]
     # Rasterize
-    mask_expanded, _ = rasterize_geoms(geoms, bbox_expanded, pixel_size_deg)
+    mask_expanded, _ = rasterize_geoms(geoms, bbox_expanded)
     # Clip back to core tile
     tile_mask = clip_array_to_window(
         mask_expanded, row0e, col0e, row0, row1, col0, col1
     )
-    tile_bbox = window_to_bbox(row0, row1, col0, col1, pixel_size_deg)
+    tile_bbox = window_to_bbox(row0, row1, col0, col1)
     return {
         "tile_mask": tile_mask,
         "tile_bbox": tile_bbox,
@@ -159,36 +162,24 @@ def build_mask_tile(row0, row1, col0, col1, pixel_size_deg, overlap_px, db_confi
 # --- Complete Mask Flow ---
 def generate_mask_tiles(
     global_bbox: Tuple[float, float, float, float],
-    pixel_size_deg: float,
-    tile_px: int,
-    overlap_px: int,
     output_dir: str,
-    db_config: dict,
+    **db_config,
 ):
     """
-    Orchestrates the query and rasterization for a region.
+    Orchestrates the query and rasterization using environment variables.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-
-    # Tile Computation for Progress Logging
-    nx, ny, total = tile_count_over_bbox(global_bbox, pixel_size_deg, tile_px)
-    # logger.info(f"Global Grid: {grid_shape(pixel_size_deg)}")
-    # logger.info(f"Region: {nx}x{ny} tiles ({total} total)")
-
+    # Progress Info
+    nx, ny, total = tile_count_over_bbox(global_bbox)
     # Iterate and Process Raster
-    for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox, pixel_size_deg, tile_px):
-        tile_data = build_mask_tile(
-            r0, r1, c0, c1, pixel_size_deg, overlap_px, db_config
-        )  # build_mask_tile handles the expanded query and the clip back to core tile_px
+    for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox):
+        tile_data = build_mask_tile(r0, r1, c0, c1, **db_config)
         mask = tile_data["tile_mask"]
         bbox = tile_data["tile_bbox"]
-        # Saving ONLY if roads exists (optional optimization)
         if mask.any():
             filename = f"{REGION}_tile_{r0}_{c0}_{RES_SUFFIX}.tif"
             filepath = output_path / filename
             write_mask_geotiff(filepath, mask, bbox)
-            # logger.info(f"Saved: {filename} ({tile_data['roads_count']} roads)")
         else:
-            # logger.info(f"Skipping empty tile: {r0}_{c0}")
             print(f"Skipping empty tile: {r0}_{c0}")

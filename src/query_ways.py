@@ -2,18 +2,15 @@ import psycopg
 from shapely import wkb
 from typing import List, Tuple
 from shapely.geometry import base
-from src.utils.helpers import OSM_HIGHWAYS
+from src.utils.helpers import OSM_HIGHWAYS, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
 
 
 def fetch_highways(
-    bbox_tile,
-    host="localhost",
-    port=5440,
-    dbname="gis",
-    user="postgres",
-    password="postgres",
-    highway_filters=OSM_HIGHWAYS,
+    bbox_tile: Tuple[float, float, float, float],
 ) -> List[Tuple[base.BaseGeometry, str]]:
+    """
+    Fetches highways from PostGIS using credentials defined in environment variables.
+    """
     left, bottom, right, top = bbox_tile
     QUERY = """
     WITH bbox AS (
@@ -28,19 +25,19 @@ def fetch_highways(
       AND ST_Intersects(l.way, b.geom);
     """
     conn = psycopg.connect(
-        host=host, port=port, dbname=dbname, user=user, password=password
+        host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS
     )
     try:
         with conn.cursor() as cur:
-            # Total 5 arguments: 4 for envelope, 1 for highway list
-            cur.execute(QUERY, (left, bottom, right, top, highway_filters))
+            # Pass OSM_HIGHWAYS from the helper directly into the query
+            cur.execute(QUERY, (left, bottom, right, top, OSM_HIGHWAYS))
             rows = cur.fetchall()
     finally:
         conn.close()
     out = []
     for geom_wkb, hw_tag in rows:
         try:
-            g = wkb.loads(geom_wkb)
+            g = wkb.loads(bytes(geom_wkb))  # Ensure it's treated as bytes
             if g is None or g.is_empty:
                 continue
             out.append((g, hw_tag))
