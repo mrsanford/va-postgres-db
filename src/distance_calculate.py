@@ -72,7 +72,6 @@ def process_region_grouped_distance(
     """
     Processes distance calculations using environment-defined tile and block sizes.
     """
-
     # --- Stage 1: Build the Mask Store ---
     mask_store = {}
     for r0, r1, c0, c1 in tile_iter_over_bbox(global_bbox, PIXEL_SIZE_DEG, TILE_PX):
@@ -89,45 +88,37 @@ def process_region_grouped_distance(
             mask_store[(r0, c0)] = build_mask_tile(
                 r0, r1, c0, c1, PIXEL_SIZE_DEG, OVERLAP_PX, **db_config
             )
-
     # --- Stage 2: Grouped Distance Assembly ---
     halo_px = int(TILE_PX * HALO_TILES)
     block_px = TILE_PX * BLOCK_TILES
-
     for br0, br1, bc0, bc1 in tile_iter_over_bbox(
         global_bbox, PIXEL_SIZE_DEG, block_px
     ):
         mr0, mr1, mc0, mc1 = br0 - halo_px, br1 + halo_px, bc0 - halo_px, bc1 + halo_px
         mosaic_h, mosaic_w = mr1 - mr0, mc1 - mc0
         mosaic = np.zeros((mosaic_h, mosaic_w), dtype=np.uint8)
-
         search_r0 = (mr0 // TILE_PX) * TILE_PX
         search_r1 = ((mr1 + TILE_PX - 1) // TILE_PX) * TILE_PX
         search_c0 = (mc0 // TILE_PX) * TILE_PX
         search_c1 = ((mc1 + TILE_PX - 1) // TILE_PX) * TILE_PX
-
         for tr0 in range(search_r0, search_r1, TILE_PX):
             for tc0 in range(search_c0, search_c1, TILE_PX):
                 tile = mask_store.get((tr0, tc0))
                 if tile:
                     m = tile["tile_mask"]
                     r_off, c_off = tr0 - mr0, tc0 - mc0
-
                     mos_r0, mos_c0 = max(0, r_off), max(0, c_off)
                     mos_r1, mos_c1 = (
                         min(r_off + TILE_PX, mosaic_h),
                         min(c_off + TILE_PX, mosaic_w),
                     )
-
                     mask_r0, mask_c0 = max(0, -r_off), max(0, -c_off)
                     mask_r1 = mask_r0 + (mos_r1 - mos_r0)
                     mask_c1 = mask_c0 + (mos_c1 - mos_c0)
-
                     mosaic[mos_r0:mos_r1, mos_c0:mos_c1] = np.maximum(
                         mosaic[mos_r0:mos_r1, mos_c0:mos_c1],
                         m[mask_r0:mask_r1, mask_c0:mask_c1],
                     )
-
         # --- Stage 3: Float Distance Calculation ---
         if not mosaic.any():
             dist_mosaic = np.full(mosaic.shape, np.nan, dtype=np.float32)
@@ -135,7 +126,6 @@ def process_region_grouped_distance(
             m_bbox = window_to_bbox(mr0, mr1, mc0, mc1, PIXEL_SIZE_DEG)
             transform = from_bounds(*m_bbox, mosaic_w, mosaic_h)
             dist_mosaic = calculate_distance(mosaic, transform)
-
         # --- Stage 4: Yield Clipped Tiles ---
         for tr0 in range(br0, br1, TILE_PX):
             for tc0 in range(bc0, bc1, TILE_PX):

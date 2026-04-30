@@ -29,15 +29,16 @@ def fetch_highways(
     )
     try:
         with conn.cursor() as cur:
-            # Pass OSM_HIGHWAYS from the helper directly into the query
-            cur.execute(QUERY, (left, bottom, right, top, OSM_HIGHWAYS))
+            cur.execute(
+                QUERY, (left, bottom, right, top, OSM_HIGHWAYS)
+            )  # passing OSM_HIGHWAYS to the query
             rows = cur.fetchall()
     finally:
         conn.close()
     out = []
     for geom_wkb, hw_tag in rows:
         try:
-            g = wkb.loads(bytes(geom_wkb))  # Ensure it's treated as bytes
+            g = wkb.loads(bytes(geom_wkb))
             if g is None or g.is_empty:
                 continue
             out.append((g, hw_tag))

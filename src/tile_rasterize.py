@@ -83,13 +83,11 @@ def tile_iter_over_bbox(bbox: Tuple[float, float, float, float]):
     min_lon, min_lat, max_lon, max_lat = bbox
     row_top, col_left = coords_to_rowcol(min_lon, max_lat)
     row_bot, col_right = coords_to_rowcol(max_lon, min_lat)
-
     # Snap to tile boundaries
     row0 = snap_direction(min(row_top, row_bot), "down")
     row1 = snap_direction(max(row_top, row_bot) + 1, "up")
     col0 = snap_direction(min(col_left, col_right), "down")
     col1 = snap_direction(max(col_left, col_right) + 1, "up")
-
     for r0 in range(row0, row1, TILE_PX):
         for c0 in range(col0, col1, TILE_PX):
             yield (r0, r0 + TILE_PX, c0, c0 + TILE_PX)
