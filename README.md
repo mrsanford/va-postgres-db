@@ -4,19 +4,18 @@ This project provides an automated pipeline for generating road network masks an
 
 ## Architecture
 The system is divided into three functional portions:
-### 1. PostGIS Database
-A containerized Postgres/PostGIS instance that stores OSM data. The test case for this project is the US state of Virginia.
-### 2. OSM Importer
-An automated service that downloads and imports the latest .osm.pbf file into the database.
-### 3. Workflow Runner
-The Python-based processing engine handling the mask and distance calculations in tiled blocks.
+   **1. PostGIS Database**
+        A containerized Postgres/PostGIS instance that stores OSM data. The test case for this project is the US state of Virginia.
+    **2. OSM Importer**
+        An automated service that downloads and imports the latest .osm.pbf file into the database.
+    **3. Workflow Runner**
+        The Python-based processing engine handling the mask and distance calculations in tiled blocks.
 
 ## Getting Started
+
+### Prerequisites
 * Docker and Docker Compose
 * Disk Space: Ensure 16GB available for OSM data processing (for Virginia)
-
-
-## Quick Start
 
 ### 1. Pre-Built Image
 If using the preconfigured workflow image, pull the image directly to your machine:
@@ -99,9 +98,10 @@ The output from the distance raster calculations are individual distance GeoTIFF
 ### Visualizing in QGIS
 The methodology was tested by subsetting 30km regions near Richmond and Chesapeake, VA, respectively.
 
+## Tips and Tricks
+**Connecting to the Database**
+`psql - h localhost -p 5440 -U postgres -d gis`
+
 ## License and Credits
 * Data Source: OpenStreetMap (OSM) via GeoFabrik
 
-### Tips and Tricks
-**Connecting to the Database**
-`psql - h localhost -p 5440 -U postgres -d gis`
