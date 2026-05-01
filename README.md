@@ -1,100 +1,107 @@
-# Geofabrik-OSM Raster Pipeline
+# GeoFabrik-OSM Raster Pipeline
 
-This project encompasses a customized, containerized workflow for ingesting OpenStreetMap (OSM) data into PostGIS and generating high-resolution "distance-to-roads" raster.
+This project provides an automated pipeline for generating road network masks and calculating Euclidean distance rasters using OpenStreetMap (OSM) data. 
+
+## Architecture
+The system is divided into three functional portions:
+### 1. PostGIS Database
+A containerized Postgres/PostGIS instance that stores OSM data. The test case for this project is the US state of Virginia.
+### 2. OSM Importer
+An automated service that downloads and imports the latest .osm.pbf file into the database.
+### 3. Workflow Runner
+The Python-based processing engine handling the mask and distance calculations in tiled blocks.
+
+## Getting Started
+* Docker and Docker Compose
+* Disk Space: Ensure 16GB available for OSM data processing (for Virginia)
+
 
 ## Quick Start
 
-1. **Initialize the Environment**
-The project uses `docker compose` to orchestrate the PostGIS database and the Python processing environments. 
-``` 
-# To start the stack
-docker compose up
+### 1. Pre-Built Image
+If using the preconfigured workflow image, pull the image directly to your machine:
+```docker pull ghcr.io/mrsanford/va-postgres-db:main```
 
-# Stop the stack
-docker compose down
-```
+### 2. Configuration
+There are a handful of adjustable environment variables defined in `helpers.py` and the `docker-compose.yaml` file. Custom options can be overwritten in a `.env` file.
+* `REGION`: The prefix name for your output files (default is `USA_VA`)
+* `PIXEL_SIZE_DEG`: The resolution (e.g., `0.0001` corresponds to roughly 10m/pixel)
+* `OSM_HIGHWAYS`: The road types to include in queries and calculations (default include primary, secondary, and tertiary motorways and trunks)
 
-2. **Access the Database**
-After the container starts and is running, you can connect to the local PostGIS instance:
-```
-psql - h localhost -p 5440 -U postgres -d gis
-```
-
-## Raster Generation
-**Distance Seam Mitigation**
-**Configuration Goals**
-
-
-## Init
-```docker compose up```
-The first time will start the container, download the data into a PostGRES/PostGIS database, and allow queries. 
-```docker compose down```
-
-Welcome to the PostGIS/OSM repo, which tracks the changes for the containerized workflow and Python (uv-managed) section. This project allows users to start up the container, download data into a postgres database, immediately query, and ultimately get a distance-to-roads raster.
-
-Buffer boxes:
-1. You could get the bounding box and then a function to go back and get a bounding box (like an extra *n* kms larger than the bbox, a box within a box and get the extras)
-2. **Make buffer configurable 1km^2 pixel or 3-5km^2s**
-3. Pixel size & determining a max distance cap
-    - Play with small chunks of Virginia (10kms around with buffer)
-    - Fix the database
-    - Update the querying logic
-
-Chunk the raster. Determine the size of the total raster.
-The buffer created of the subsetted raster, extend those bounds and calculate everything inside the bounds.
-Two bounding boxes, extend of the actual sub raster, second bounding box is the bounds + the buffer (THIS BUFFER SHOULD BE CONFIGURABLE)
-- Might need to convert units
-- You should be able to query the database with the raster bounding boxes
-
-Quick Aside:
-- PostGIS spatially indexes the data by location
-- The database can handle data inside bounding boxes
-
+### 3. Running the Pipeline
+Launch the stack with Docker Compose, which handles database setup, data import, and automated script execution.
+```bash
 docker compose up -d
-docker compose down
+```
 
-The goal is one massive raster for the world
-1. Prebuild the raster plan
-2. Calculate the entire size of the world raster depending on the pixel size
+## Technical File Reference
+```.
+├── .venv/
+├── .github/
+│   ├── utils/
+│      └── build.yml
+├── db/
+│   ├── Dockerfile
+│   └── init-db.sh
+├── importer/
+│    ├── Dockerfile
+│    └── import.sh
+├── osmdata/
+│   ├── pgdata/
+│       ├── *           # All PostGIS database infrastructure and content exists
+├── src/
+│   ├── utils/
+│   │   └── helpers.py
+│   ├── distance_calculate.py
+│   ├── query_ways.py
+│   └── tile_rasterize.py
+├── vizualization/
+│   ├── distance/
+│   ├── mask/
+├── compute.py
+├── docker-compose.yaml
+├── Dockerfile
+├── pyproject.toml
+└── uv.lock
+```
 
-Decide how big the raster will be!!!!! Size the pixels based on?
-Standard mercator projection is degrees and convert it to get it to ~1km^2 in VA
+## Output References
+The file `compute.py` controls the automation of the workflow execution and is managed through the `docker-compose.yml` but can also be managed by `uv run compute.py`. The pipeline populates the `visualization/` directory defined in `helpers.py`.
 
-Test this hands on
-- pick a subset
-- add bounding box and visualize
-- so you can see on QGIS the subset and bounding box (so just a box)
+## Logic and Processing Deep Dive
+The workflow has been engineered for a tiled, buffered approach to generating a global-scale raster plan while adhering to memory limits. It gracefully handles perceived mask "seams", which commonly arise in large spatial programming where comparing tiles does not return continuous rasters when mosaicked.
 
-Next week: plan to come up with visualization
-Structure out steps and determine
-- Pick a subset of around Richmond and the bounding box of like 5-10 miles
+### 1. Global Grid Planning
+The system calculates the dimensions of the "global raster" upfront based on the `PIXEL_SIZE_DEG`.
+* Coordinate-to-Pixel Mapping: `tile_rasterize.py` maps geographic coordinates (in Lat/Lon) to a global pixel index.
+* Pixel sizes are in standard Mercator degrees (EPSG:4326). Target resolution is variable and customizable (see environment variables).
 
-accessing psql
-psql -h localhost -p 5440 -U postgres -d gis
-
-calculate the tile extent and the encompassing bounding
-fixed number of extra degrees in any direction 
-ENCOMPASSING_BOUNDING_BOX_PERCENT
+### 2. Halo Strategy
+The system mitigates distance inaccuracies at tile edges by employing a dual bounding box methodology.
+* The Target Tile: The actual `n x n` pixel area (= 1 tile) that will be saved to disk. The size of the tiles are an environment variable and are configurable. The default is 512 x 512.
+* The Encompassing Bounding Box (The Halo): the workflow offers a configurable parameter to extend the bounds of the sub-raster by the `HALO_TILES` multiplier. This constant takes fractional and whole integer values. The default is 0.8 of a tile, so the extent of the distance calculation will include the sub-raster + 80% halo.
+* Seamless Gradients: Everything is calculated inside the expanded halo box + target raster before being clipped back to the target tile. The returned output is the Target Tile with edge pixels calculated to consider distance calculations in neigboring tiles. 
 
 
-What packages and what scripts for the container?
-Add container to do the compiling work
+### 3. Database Querying
+The `query_ways.py` script uses `psycopg` to handle PostGIS to Python querying. 
+For efficient spatial indexing in target tiles and halo buffers:
+* Spatial Intersects: Queries are bounded to the halo box dimensions. This is to avoid repeat query requests to the database for redundant or multiple queries.
+* Tag Filtering: The query script is filtered to only return highway types defined in `OSM_HIGHWAYS` to reduce overhead in unecessary datum.
 
-FROM ghcr.io/astral-sh/uv:debian
+### 4. Raster Assembly and Distance Math
+* Masking: Roads are masked with a binary 0/1 mask for road networks. 0 for no road and 1 for road.
+* Euclidean Calculation: `distance_calculate.py` applies the `distancerasters` library to calculate the distance transform on the mask.
+* Batch/Block Processing: the systemm groups tiles into `BLOCK_TILES` unit for batched distance calculations. 
 
-# Dependency Install
+The output from the distance raster calculations are individual distance GeoTIFFs.
 
-build container for packaging python
-UV Documentation -- There is a container with UV
-add uv dependencies to dockerfile
+### Visualizing in QGIS
+The methodology was tested by subsetting 30km regions near Richmond and Chesapeake, VA, respectively.
 
-DOCKER:
-COPY just the pyproject.toml
-COPY just the .python-version
-COPY the uv.lock
-uv sync
+## License and Credits
+* Data Source: OpenStreetMap (OSM) via GeoFabrik
 
-COPY src
-
-# github actions right after the docker
-# everytime you commit, container will be rebuilt
+### Tips and Tricks
+**Connecting to the Database**
+`psql - h localhost -p 5440 -U postgres -d gis`
